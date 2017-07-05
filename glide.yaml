@@ -1,0 +1,16 @@
+package: github.com/davepgreene/propsd
+import:
+- package: github.com/spf13/cobra
+- package: github.com/Sirupsen/logrus
+  version: ^1.0.0
+- package: github.com/gorilla/handlers
+  version: ^1.2.1
+- package: github.com/thoas/stats
+- package: github.com/gorilla/mux
+  version: ^1.4.0
+- package: github.com/aws/aws-sdk-go
+  version: ^1.10.6
+- package: github.com/hashicorp/consul
+  version: ^0.8.5
+  subpackages:
+  - api
