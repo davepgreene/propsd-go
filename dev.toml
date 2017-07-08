@@ -2,7 +2,7 @@
 bucket = "foo.bar.com"
 
 [metadata]
-host = "127.0.0.1:8900"
+host = "http://127.0.0.1:8900"
 
 [log]
 json = false

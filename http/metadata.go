@@ -23,9 +23,10 @@ func (h *metadataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		m := sources.NewMetadataSource(*s)
 		m.Get()
+		m.Poll()
 
 		w.WriteHeader(http.StatusNotImplemented)
-		b, _ := json.Marshal(h)
+		b, _ := json.Marshal(m.Properties())
 
 		w.Write(b)
 	}

@@ -23,21 +23,20 @@ var log = map[string]interface{}{
 }
 
 var consul = map[string]interface{}{
-	"host": 	"127.0.0.1",
+	"host": 	"http://127.0.0.1",
 	"port": 	8500,
 	"secure": 	false,
 }
 
 var tokend = map[string]interface{}{
-	"host":		"127.0.0.1",
+	"host":		"http://127.0.0.1",
 	"port":		4500,
 	"interval":	300000,
 }
 
 var metadata = map[string]interface{}{
-	"host": 	"169.254.169.254",
+	"host": 	"http://169.254.169.254",
 	"interval": 	30000,
-	"timeout":	500,
 	"version":	"latest",
 }
 

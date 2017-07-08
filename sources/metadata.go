@@ -5,104 +5,90 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	//"github.com/davepgreene/propsd/api"
-	"encoding/json"
-	"github.com/spf13/viper"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"fmt"
+	"github.com/davepgreene/propsd/utils"
+	log "github.com/Sirupsen/logrus"
+	"github.com/davepgreene/propsd/parsers"
 )
-
-var METADATA_PATHS = []string{
-	//"ami-id", GET FROM EC2InstanceIdentityDocument - ImageID
-	//"placement/availability-zone", GET FROM EC2InstanceIdentityDocument - AvailabilityZone
-	"hostname",
-	//"instance-id", GET FROM EC2InstanceIdentityDocument - InstanceID
-	//"instance-type", GET FROM EC2InstanceIdentityDocument - InstanceType
-	// "local-ipv4",  GET FROM EC2InstanceIdentityDocument - PrivateIP
-	"local-hostname",
-	"public-hostname",
-	"public-ipv4",
-	"reservation-id",
-	"security-groups",
-	//"identity", GET FROM EC2InstanceIdentityDocument - Marshall object to JSON
-	//"region", GET FROM EC2InstanceIdentityDocument - Region
-	//"account", GET FROM EC2InstanceIdentityDocument - AccountID
-	"iam/security-credentials",
-	"mac",
-	"network/interfaces/macs",
-}
-
-var DYNAMIC_PATHS = []string{
-	"instance-identity/pkcs7",
-}
 
 type MetadataOptions struct {
 
 }
 
+type MetadataChannelResponse struct {
+	Path string
+	Body string
+}
+
+type MetadataChannelErrorResponse struct {
+	Path string
+	Error error
+}
+
 type Metadata struct {
-	rawProperties map[string]*json.RawMessage
+	rawProperties map[string]string
 	client *ec2metadata.EC2Metadata
+	parser *parsers.Metadata
 }
 
 func NewMetadataSource(session session.Session) *Metadata {
 	// We need to assemble our client manually so we can override host and timeout if we want
 	c := session.ClientConfig("ec2metadata", aws.NewConfig())
-	endpoint := viper.GetString("metadata.host")
-	client := ec2metadata.NewClient(*c.Config, c.Handlers, endpoint, c.SigningRegion,
-		// Additional functions to modify the client
-		func(client *client.Client) {
-			if (viper.IsSet("metadata.version")) {
-				client.APIVersion = viper.GetString("metadata.version")
-			}
-		}, func(client *client.Client) {
-			if (viper.IsSet("metadata.timeout")) {
-				client.Config.HTTPClient.Timeout = viper.GetDuration("metadata.timeout")
-			}
-		})
 
 	return &Metadata{
-		client: client,
-		rawProperties: make(map[string]*json.RawMessage),
+		client: utils.CreateMetadataClient(c),
+		rawProperties: make(map[string]string),
+		parser: parsers.NewMetadataParser(session),
 	}
 }
 
 func (m *Metadata) Get() {
-	resc, errc := make(chan string), make(chan error)
-	totalRequests := len(METADATA_PATHS) + len(DYNAMIC_PATHS)
-	f := m.fetch(resc, errc)
-
-	for _, path := range METADATA_PATHS {
-		go f(path, m.client.GetMetadata)
+	resc, errc := make(chan MetadataChannelResponse), make(chan MetadataChannelErrorResponse)
+	paths := map[string]string {
+		"instance-identity/document": "GetDynamicData",
+		"hostname": "GetMetadata",
+		"local-ipv4": "GetMetadata",
+		"local-hostname": "GetMetadata",
+		"public-hostname": "GetMetadata",
+		"public-ipv4": "GetMetadata",
+		"reservation-id": "GetMetadata",
+		"security-groups": "GetMetadata",
+		"instance-identity/pkcs7": "GetDynamicData",
+		"iam/security-credentials": "GetMetadata",
+		"network/interfaces/macs": "GetMetadata",
 	}
 
-	for _, path := range DYNAMIC_PATHS {
-		go f(path, m.client.GetDynamicData)
+	for path, function := range paths {
+		fn := utils.GetMethod(m.client, function).(func(string) (string, error))
+		go m.fetch(resc, errc)(path, fn)
 	}
 
-	for i := 0; i < totalRequests; i++ {
+	for i := 0; i < len(paths); i++ {
 		select {
 		case res := <-resc:
-			fmt.Println(res)
+			m.rawProperties[res.Path] = res.Body
 		case err := <-errc:
-			fmt.Println(err)
+			log.Errorf("Aws-sdk returned the following error during the metadata service request to %s", err.Path)
 		}
 	}
 
+	m.rawProperties["auto-scaling-group"] = ""
 }
 
-func (m *Metadata) fetch(resc chan string, errc chan error) func(path string, method func(string) (string, error)) {
+func (m *Metadata) Poll() {
+	m.parser.Parse(m.rawProperties)
+}
+
+func (m *Metadata) fetch(resc chan MetadataChannelResponse, errc chan MetadataChannelErrorResponse) func(string, func(string) (string, error)) {
 	return func(path string, method func(string) (string, error)) {
 		body, err := method(path)
 		if err != nil {
-			errc <- err
+			errc <- MetadataChannelErrorResponse{path,err}
 			return
 		}
-		resc <- string(body)
+		resc <- MetadataChannelResponse{path,body}
 	}
 }
 
-func (m *Metadata) getInstanceIdentityDocument() {
-
+func (m *Metadata) Properties() *parsers.MetadataProperties {
+	return m.parser.Properties()
 }
-
-//func (m *Metadata)

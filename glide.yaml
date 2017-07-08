@@ -14,3 +14,7 @@ import:
   version: ^0.8.5
   subpackages:
   - api
+- package: github.com/fatih/structs
+  version: ^1.0.0
+- package: gopkg.in/oleiade/lane.v1
+  version: ^1.0.0

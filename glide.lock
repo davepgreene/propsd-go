@@ -1,10 +1,39 @@
-hash: 603b2acbaa95716d80a61bbccdca2a317d25e1b85dc93eadda625eb9b3ded178
-updated: 2017-07-04T09:59:36.867184389-04:00
+hash: a01b3bc6abab01cc01043ec2be23a3f7a33a110fd031556c8beac00e3444688c
+updated: 2017-07-08T07:23:54.655093584-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: a5a7f553e106c0b1dcbfbdaeb8774592fcc1a68a
+  version: b1a7b51924b90a6ecdbaeb17e96418740ff07a1e
+  subpackages:
+  - aws
+  - aws/awserr
+  - aws/awsutil
+  - aws/client
+  - aws/client/metadata
+  - aws/corehandlers
+  - aws/credentials
+  - aws/credentials/ec2rolecreds
+  - aws/credentials/endpointcreds
+  - aws/credentials/stscreds
+  - aws/defaults
+  - aws/ec2metadata
+  - aws/endpoints
+  - aws/request
+  - aws/session
+  - aws/signer/v4
+  - internal/shareddefaults
+  - private/protocol
+  - private/protocol/query
+  - private/protocol/query/queryutil
+  - private/protocol/rest
+  - private/protocol/xml/xmlutil
+  - service/autoscaling
+  - service/sts
+- name: github.com/fatih/structs
+  version: a720dfa8df582c51dee1b36feabb906bde1588bd
 - name: github.com/fsnotify/fsnotify
   version: 4da3e2cfbabc9f751898f250b49f2439785783a1
+- name: github.com/go-ini/ini
+  version: 3d73f4b845efdf9989fffd4b4e562727744a34ba
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/handlers
@@ -28,6 +57,8 @@ imports:
   - json/token
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- name: github.com/jmespath/go-jmespath
+  version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
 - name: github.com/magiconair/properties
   version: f917359f079a3759162704eaa8caeec3d01d9f91
 - name: github.com/meatballhat/negroni-logrus
@@ -67,6 +98,8 @@ imports:
   subpackages:
   - transform
   - unicode/norm
+- name: gopkg.in/oleiade/lane.v1
+  version: 28f7c3f09254f12b51e620fa4db136ba58804762
 - name: gopkg.in/tylerb/graceful.v1
   version: 4654dfbb6ad53cb5e27f37d99b02e16c1872fbbb
 - name: gopkg.in/yaml.v2
