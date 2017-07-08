@@ -2,16 +2,15 @@ package sources
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 	//"github.com/davepgreene/propsd/api"
-	"github.com/davepgreene/propsd/utils"
 	log "github.com/Sirupsen/logrus"
 	"github.com/davepgreene/propsd/parsers"
+	"github.com/davepgreene/propsd/utils"
 )
 
 type MetadataOptions struct {
-
 }
 
 type MetadataChannelResponse struct {
@@ -20,12 +19,11 @@ type MetadataChannelResponse struct {
 }
 
 type MetadataChannelErrorResponse struct {
-	Path string
+	Path  string
 	Error error
 }
 
 type Metadata struct {
-	rawProperties map[string]string
 	client *ec2metadata.EC2Metadata
 	parser *parsers.Metadata
 }
@@ -36,57 +34,60 @@ func NewMetadataSource(session session.Session) *Metadata {
 
 	return &Metadata{
 		client: utils.CreateMetadataClient(c),
-		rawProperties: make(map[string]string),
 		parser: parsers.NewMetadataParser(session),
 	}
 }
 
 func (m *Metadata) Get() {
-	resc, errc := make(chan MetadataChannelResponse), make(chan MetadataChannelErrorResponse)
-	paths := map[string]string {
-		"instance-identity/document": "GetDynamicData",
-		"hostname": "GetMetadata",
-		"local-ipv4": "GetMetadata",
-		"local-hostname": "GetMetadata",
-		"public-hostname": "GetMetadata",
-		"public-ipv4": "GetMetadata",
-		"reservation-id": "GetMetadata",
-		"security-groups": "GetMetadata",
-		"instance-identity/pkcs7": "GetDynamicData",
-		"iam/security-credentials": "GetMetadata",
-		"network/interfaces/macs": "GetMetadata",
+	resc, errc := make(chan string), make(chan string)
+	paths := map[string]func(string) (string, error){
+		"instance-identity/document": m.client.GetDynamicData,
+		"hostname":                   m.client.GetMetadata,
+		"local-ipv4":                 m.client.GetMetadata,
+		"local-hostname":             m.client.GetMetadata,
+		"public-hostname":            m.client.GetMetadata,
+		"public-ipv4":                m.client.GetMetadata,
+		"reservation-id":             m.client.GetMetadata,
+		"security-groups":            m.client.GetMetadata,
+		"instance-identity/pkcs7":    m.client.GetDynamicData,
+		"iam/security-credentials":   m.client.GetMetadata,
+		"network/interfaces/macs":    m.client.GetMetadata,
 	}
 
-	for path, function := range paths {
-		fn := utils.GetMethod(m.client, function).(func(string) (string, error))
-		go m.fetch(resc, errc)(path, fn)
+	for path, fn := range paths {
+		go m.fetch(resc, errc, path, fn, m.parser.Parsers[path])
 	}
 
 	for i := 0; i < len(paths); i++ {
 		select {
 		case res := <-resc:
-			m.rawProperties[res.Path] = res.Body
+			log.Debugf("Parsed data from %s", res)
 		case err := <-errc:
-			log.Errorf("Aws-sdk returned the following error during the metadata service request to %s", err.Path)
+			log.Errorf("Aws-sdk returned the following error during the metadata service request to %s", err)
 		}
 	}
 
-	m.rawProperties["auto-scaling-group"] = ""
+	// We can use goroutines for all the other metadata but because ASG relies on instance region and ID we
+	// have to wait until those are complete.
+	//
+	// If we run into performance issues here we can implement a queue with re-queue operations, spawn
+	// goroutines for every queued element and then re-queue the ASG request if region and instance ID
+	// haven't been retrieved yet.
+	m.parser.Parsers["auto-scaling-group"]("")
 }
 
 func (m *Metadata) Poll() {
-	m.parser.Parse(m.rawProperties)
+	log.Info(m.Properties())
 }
 
-func (m *Metadata) fetch(resc chan MetadataChannelResponse, errc chan MetadataChannelErrorResponse) func(string, func(string) (string, error)) {
-	return func(path string, method func(string) (string, error)) {
-		body, err := method(path)
-		if err != nil {
-			errc <- MetadataChannelErrorResponse{path,err}
-			return
-		}
-		resc <- MetadataChannelResponse{path,body}
+func (m *Metadata) fetch(resc chan string, errc chan string, path string, method func(string) (string, error), parser func(string)) {
+	body, err := method(path)
+	if err != nil {
+		errc <- path
+		return
 	}
+	parser(body)
+	resc <- path
 }
 
 func (m *Metadata) Properties() *parsers.MetadataProperties {
